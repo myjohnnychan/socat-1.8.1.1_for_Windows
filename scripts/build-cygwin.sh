@@ -14,6 +14,8 @@ rm -rf "${SOURCE_DIR}" "${DIST_ROOT}" "${ROOT}/socat-version.txt"
 tar -xzf "${ARCHIVE}"
 cd "${SOURCE_DIR}"
 
+chmod +x configure install-sh ./*.sh 2>/dev/null || true
+
 ./configure --enable-default-ipv=4
 make -j"$(nproc)"
 
