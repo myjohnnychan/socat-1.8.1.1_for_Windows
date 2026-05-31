@@ -16,7 +16,7 @@ jobs:
     timeout-minutes: 60
     env:
       SOCAT_VERSION: 1.8.1.1
-      CYGWIN_ROOT: ${{ runner.temp }}\cygwin64
+      CYGWIN_ROOT: C:\cygwin64
 
     steps:
       - name: Check out repository
