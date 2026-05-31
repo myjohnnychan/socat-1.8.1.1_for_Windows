@@ -1,0 +1,77 @@
+name: Build socat for Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  cygwin-x86_64:
+    name: Cygwin x86_64
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      SOCAT_VERSION: 1.8.1.1
+      CYGWIN_ROOT: C:\cygwin64
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Cygwin build dependencies
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+
+          $installer = Join-Path $env:RUNNER_TEMP "setup-x86_64.exe"
+          $cache = Join-Path $env:RUNNER_TEMP "cygwin-cache"
+          New-Item -ItemType Directory -Force -Path $cache | Out-Null
+
+          Invoke-WebRequest -Uri "https://cygwin.com/setup-x86_64.exe" -OutFile $installer
+
+          $packages = @(
+            "gcc-core",
+            "make",
+            "libssl-devel",
+            "libreadline-devel",
+            "libwrap-devel",
+            "tcp_wrappers",
+            "zip"
+          ) -join ","
+
+          & $installer `
+            --quiet-mode `
+            --no-shortcuts `
+            --no-startmenu `
+            --no-admin `
+            --only-site `
+            --root $env:CYGWIN_ROOT `
+            --local-package-dir $cache `
+            --site "https://mirrors.kernel.org/sourceware/cygwin/" `
+            --packages $packages
+
+      - name: Build socat
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+
+          $bash = Join-Path $env:CYGWIN_ROOT "bin\bash.exe"
+          $cygpath = Join-Path $env:CYGWIN_ROOT "bin\cygpath.exe"
+          $workspace = & $cygpath -u $env:GITHUB_WORKSPACE
+
+          & $bash -lc "cd '$workspace' && bash scripts/build-cygwin.sh"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: socat-${{ env.SOCAT_VERSION }}-cygwin-x86_64
+          path: |
+            dist/socat-${{ env.SOCAT_VERSION }}-cygwin-x86_64.zip
+            socat-version.txt
+          if-no-files-found: error
