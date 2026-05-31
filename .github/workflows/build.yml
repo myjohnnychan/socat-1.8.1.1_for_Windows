@@ -16,7 +16,7 @@ jobs:
     timeout-minutes: 60
     env:
       SOCAT_VERSION: 1.8.1.1
-      CYGWIN_ROOT: C:\cygwin64
+      CYGWIN_ROOT: ${{ runner.temp }}\cygwin64
 
     steps:
       - name: Check out repository
@@ -44,16 +44,26 @@ jobs:
             "zip"
           ) -join ","
 
-          & $installer `
-            --quiet-mode `
-            --no-shortcuts `
-            --no-startmenu `
-            --no-admin `
-            --only-site `
-            --root $env:CYGWIN_ROOT `
-            --local-package-dir $cache `
-            --site "https://mirrors.kernel.org/sourceware/cygwin/" `
-            --packages $packages
+          $installArgs = @(
+            "--quiet-mode",
+            "--no-shortcuts",
+            "--no-startmenu",
+            "--no-admin",
+            "--root", $env:CYGWIN_ROOT,
+            "--local-package-dir", $cache,
+            "--site", "https://mirrors.kernel.org/sourceware/cygwin/",
+            "--packages", $packages
+          )
+
+          $process = Start-Process -FilePath $installer -ArgumentList $installArgs -Wait -PassThru -NoNewWindow
+          if ($process.ExitCode -ne 0) {
+            throw "Cygwin setup failed with exit code $($process.ExitCode)."
+          }
+
+          if (!(Test-Path (Join-Path $env:CYGWIN_ROOT "bin\bash.exe"))) {
+            Get-ChildItem -Path $env:CYGWIN_ROOT -Recurse -Depth 2 -ErrorAction SilentlyContinue
+            throw "Cygwin bash.exe was not installed under $env:CYGWIN_ROOT."
+          }
 
       - name: Build socat
         shell: pwsh
